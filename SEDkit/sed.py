@@ -9,8 +9,6 @@ import numpy as np
 import astropy.table as at
 import astropy.units as q
 import astropy.constants as ac
-import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from . import utilities as u
 from . import syn_phot as s
@@ -77,9 +75,9 @@ class MakeSED(object):
         from astrodbkit import astrodb
         from SEDkit import sed
         db = astrodb.Database('/Users/jfilippazzo/Documents/Modules/BDNYCdevdb/bdnycdev.db')
-        from_dict = {'spectra':3176, 'photometry':'*', 'parallaxes':575, 'sources':2}
+        from_dict = {'spectra':[1564,3176], 'photometry':[12506,12507,12508,12509,12510,12511,12512,12513,12514,12515,12516,12517], 'parallaxes':575, 'sources':2}
         x = sed.MakeSED(2, db, from_dict=from_dict)
-        x.plot()
+        x.plot(integrals=False)
         
         """
         # TODO: resolve source_id in database given id, (ra,dec), name, etc.
@@ -419,7 +417,7 @@ class MakeSED(object):
             
         # Normalize the composite spectra to the available photometry
         for n,spec in enumerate(piecewise):
-            piecewise[n] = s.norm_to_mags(spec, self.photometry, plot=True)
+            piecewise[n] = s.norm_to_mags(spec, self.photometry, plot=False)
             
         # Add piecewise spectra to table
         self.piecewise = at.Table([[spec[i] for spec in piecewise] for i in [0,1,2]], names=['wavelength','app_flux','app_flux_unc'])

@@ -38,7 +38,7 @@ def all_mags(spectrum, bands='', plot=False, **kwargs):
     # Calculate the magnitude
     mag_list = []
     for bandpass in bands:
-        m, sig_m, F, sig_F = get_mag(spectrum, bandpass, fetch='both', **kwargs)
+        m, sig_m, F, sig_F = get_mag(spectrum, bandpass, fetch='both', plot=plot, **kwargs)
         
         # Only add it to the table if the magnitude is calculated
         if m:
@@ -52,13 +52,13 @@ def all_mags(spectrum, bands='', plot=False, **kwargs):
     table = at.QTable(data, names=['band','eff','app_magnitude','app_magnitude_unc','app_flux','app_flux_unc'])
     
     if plot and data:
-        plt.figure()
+        # plt.figure()
         plt.step(spectrum[0], spectrum[1], color='k', label='Spectrum')
-        plt.errorbar(table['eff'], table['app_flux'], yerr=table['app_flux_unc'], marker='o', ls='none', label='Magnitudes')
         try:
             plt.fill_between(spectrum[0], spectrum[1]+spectrum[2], spectrum[1]+spectrum[2], color='k', alpha=0.1)
         except:
             pass
+        # plt.errorbar(table['eff'], table['app_flux'], yerr=table['app_flux_unc'], marker='o', ls='none', label='Magnitudes')
         plt.xlabel(w_unit)
         plt.ylabel(f_unit)
         plt.legend(loc=0, frameon=False)
@@ -72,7 +72,7 @@ def all_mags(spectrum, bands='', plot=False, **kwargs):
     
     return table
 
-def norm_to_mags(spec, to_mags, weighting=False, reverse=False, plot=False):
+def norm_to_mags(spec, to_mags, weighting=True, reverse=False, plot=False):
     """
     Normalize the given spectrum to the given dictionary of magnitudes
 
@@ -117,7 +117,7 @@ def norm_to_mags(spec, to_mags, weighting=False, reverse=False, plot=False):
         pass
         
     # Calculate all synthetic magnitudes
-    mags = all_mags(spec, bands=to_mags['band'])
+    mags = all_mags(spec, bands=to_mags['band'], plot=plot)
     
     # Return red and blue wavelength positions to original values
     spec[0][0], spec[0][-1] = blue, red
@@ -125,13 +125,13 @@ def norm_to_mags(spec, to_mags, weighting=False, reverse=False, plot=False):
     try:
         # Get list of all bands in common
         bands = [b for b in list(set(mags['band']).intersection(set(to_mags['band'])))]
-        data = []
         
         # Get eff, m, m_unc from each
         eff = [FILTERS.loc[b]['WavelengthEff'] for b in bands]
         obs_mags = at.vstack([to_mags.loc[b] for b in bands])
         synthetic_mags = [list(i.as_void()) for i in mags[['app_flux','app_flux_unc']]]
         observed_mags = [list(i.as_void()) for i in obs_mags[['app_flux','app_flux_unc']]]
+        print(synthetic_mags, observed_mags)
         
         # Make arrays of the values and calculate weights
         (f1, e1), (f2, e2) = np.array([observed_mags,synthetic_mags]).swapaxes(1,2)
@@ -150,7 +150,7 @@ def norm_to_mags(spec, to_mags, weighting=False, reverse=False, plot=False):
             
         return [spec[0], spec[1]/norm, spec[2]/norm] if reverse else [spec[0], spec[1]*norm, spec[2]*norm]
         
-    except:
+    except IOError:
         print('No overlapping photometry for normalization!')
         return spec
 
@@ -307,10 +307,6 @@ def get_mag(spectrum, bandpass, exclude=[], fetch='mag', photon=False, Flam=Fals
         The bandpass to calculate
     exclude: sequecne
         The wavelength ranges to exclude by linear interpolation between gap edges
-    photon: bool
-        Use units of photons rather than energy
-    Flam: bool
-        Use flux units rather than the default flux density units
     plot: bool
         Plot it
     
@@ -340,9 +336,11 @@ def get_mag(spectrum, bandpass, exclude=[], fetch='mag', photon=False, Flam=Fals
     and all([np.logical_or(all([i<mn for i in rng]), all([i>mx for i in rng])) for rng in exclude]):
         
         # Rebin spectrum to bandpass wavelengths
-        w, f, sig_f = rebin_spec([i.value for i in spectrum], wav.value)*spectrum[1].unit
+        # w, f, sig_f = rebin_spec([i.value for i in spectrum], wav.value)*spectrum[1].unit
+        f = np.interp(wav, spectrum[0], spectrum[1])*spectrum[1].unit
+        sig_f = np.interp(wav, spectrum[0], spectrum[2])*spectrum[1].unit
         
-        # Calculate the integrated flux, subtracting the filter shape
+        # Calculate the weighted mean photon flux density
         F = (np.trapz((f*rsr*((wav/(ac.h*ac.c)).to(c) if photon else 1)).to(b), x=wav)/(np.trapz(rsr, x=wav))).to(a)
         
         # Caluclate the uncertainty
@@ -353,8 +351,10 @@ def get_mag(spectrum, bandpass, exclude=[], fetch='mag', photon=False, Flam=Fals
             
         # Make a plot
         if plot:
-            plt.figure()
+            # plt.figure()
             plt.step(spectrum[0], spectrum[1], color='k', label='Spectrum')
+            plt.step(wav, f, color='r', label='Spectrum')
+
             plt.errorbar(bandpass.WavelengthEff, F.value, yerr=sig_F.value, marker='o', label='Magnitude')
             try:
                 plt.fill_between(spectrum[0], spectrum[1]+spectrum[2], spectrum[1]+spectrum[2], color='k', alpha=0.1)
