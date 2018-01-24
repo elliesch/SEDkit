@@ -75,10 +75,9 @@ class MakeSED(object):
         from astrodbkit import astrodb
         from SEDkit import sed
         db = astrodb.Database('/Users/jfilippazzo/Documents/Modules/BDNYCdevdb/bdnycdev.db')
-        from_dict = {'spectra':[1564,3176], 'photometry':[12506,12507,12508,12509,12510,12511,12512,12513,12514,12515,12516,12517], 'parallaxes':575, 'sources':2}
+        from_dict = {'spectra':[1564,3176], 'photometry':[12506,12507,12508,12509,12510,12511,12512,12513,12514,12515,12516], 'parallaxes':575, 'sources':2}
         x = sed.MakeSED(2, db, from_dict=from_dict)
         x.plot(integrals=False)
-        
         """
         # TODO: resolve source_id in database given id, (ra,dec), name, etc.
         # source_id = db._resolve_source_id()
@@ -291,7 +290,10 @@ class MakeSED(object):
                 row['eff'] = band['WavelengthEff']*q.Unit(band['WavelengthUnit'])
             except:
                 row['eff'] = np.nan
-            
+                
+        # Sort by effective wavelength
+        self.photometry.sort('eff')
+        
         # Add absolute magnitude columns to the photometry table
         self.photometry.add_column(at.Column(fill, 'abs_magnitude', unit=q.mag))
         self.photometry.add_column(at.Column(fill, 'abs_magnitude_unc', unit=q.mag))
@@ -433,7 +435,7 @@ class MakeSED(object):
             W, F, E = W0, F0, E0 = [Q*np.array([]) for Q in units]
             
         # Create Rayleigh Jeans Tail
-        RJ_wav = np.arange(5, 500, 0.1)*q.um
+        RJ_wav = np.arange(2.2, 500, 0.1)*q.um
         RJ_flx, RJ_unc =  u.blackbody(RJ_wav, 1800*q.K, 100*q.K)
         
         # Normalize Rayleigh-Jeans tail to the longest wavelength photometric point
